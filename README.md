@@ -24,6 +24,6 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3001/shop`.
+Open `http://localhost:3000/shop`.
 
 Set `NEXT_PUBLIC_API_URL` in `.env.local` if your backend URL is different.
