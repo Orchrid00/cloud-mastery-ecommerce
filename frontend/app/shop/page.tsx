@@ -163,10 +163,10 @@ export default function ShopHome() {
           {/* Left Text */}
           <div className="max-w-xs">
             <h2 className="text-xl font-serif font-medium text-[#4a3b32]">
-              Hazel Market
+              Soko Marketplace
             </h2>
             <p className="mt-3 text-sm text-slate-600">
-              &copy; 2024 Hazel Market. The curated marketplace for everything you love.
+              &copy; 2026 Soko Marketplace. The curated marketplace for everything you love.
             </p>
           </div>
 

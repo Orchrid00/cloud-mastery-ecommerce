@@ -28,6 +28,8 @@ type Session = {
 type ShopContextType = {
   cartItems: CartItem[];
   session: Session;
+  selectedCustomerId: string;
+  setSelectedCustomerId: React.Dispatch<React.SetStateAction<string>>;
   addToCart: (product: ProductType) => void;
   removeFromCart: (productId: string) => void;
   updateCartQuantity: (productId: string, quantity: number) => void;
@@ -55,6 +57,7 @@ function readSession(): Session {
 export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [session, setSession] = useState<Session>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
 
   // ── Hydrate cart and session from sessionStorage on mount ──
   useEffect(() => {
@@ -116,7 +119,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
           }
           return merged;
         });
-      } catch (error) {
+      } catch {
         // Silently ignore network errors during polling
       }
     };
@@ -221,6 +224,8 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   const value: ShopContextType = {
     cartItems,
     session,
+    selectedCustomerId,
+    setSelectedCustomerId,
     addToCart,
     removeFromCart,
     updateCartQuantity,

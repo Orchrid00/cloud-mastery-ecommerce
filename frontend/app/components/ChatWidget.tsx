@@ -1,7 +1,6 @@
-// @ts-nocheck
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import OnboardingForm from "./OnboardingForm";
 import { createSession } from "../api";
 
@@ -11,6 +10,26 @@ interface Session {
   phone: string;
   location: string;
 }
+
+type ChatSdk = {
+  registerContext: (context: unknown) => void;
+  prebuilts: {
+    ces: {
+      createContext: (config: unknown) => unknown;
+    };
+  };
+};
+
+type ChatResponseEventDetail = {
+  response?: {
+    session?: string;
+    queryResult?: {
+      diagnosticInfo?: {
+        session?: string;
+      };
+    };
+  };
+};
 
 export default function ChatWidget() {
   const deploymentName = process.env.NEXT_PUBLIC_CHAT_DEPLOYMENT;
@@ -66,7 +85,7 @@ export default function ChatWidget() {
 
     // Register SDK context with session parameters so the agent knows who the user is
     const handleLoaded = () => {
-      const chatSdk = (window as any).chatSdk;
+      const chatSdk = (window as Window & { chatSdk?: ChatSdk }).chatSdk;
       if (chatSdk) {
         chatSdk.registerContext(
           chatSdk.prebuilts.ces.createContext({
@@ -171,14 +190,16 @@ export default function ChatWidget() {
     //   "projects/.../sessions/<sessionId>"
     // We extract the short ID and use it as the cart key in the Python service
     // (matching what the agent passes as $context.session_id to its tool calls).
-    const handleAgentResponse = async (event: CustomEvent) => {
+    const handleAgentResponse = async (event: Event) => {
       // Already linked — skip
       if (sessionStorage.getItem("agent-session-id")) return;
 
+      const detail = (event as CustomEvent<ChatResponseEventDetail>).detail;
+
       // Try both the element event and bubbled window event shapes
       const sessionPath =
-        event.detail?.response?.session ||
-        event.detail?.response?.queryResult?.diagnosticInfo?.session;
+        detail?.response?.session ||
+        detail?.response?.queryResult?.diagnosticInfo?.session;
       if (!sessionPath) return;
 
       // Extract "abc123" from "projects/.../sessions/abc123"
@@ -209,7 +230,7 @@ export default function ChatWidget() {
     window.addEventListener("df-response-received", handleAgentResponse);
 
     // Race-condition guard: if script already loaded before this effect ran
-    if ((window as any).chatSdk) {
+    if ((window as Window & { chatSdk?: ChatSdk }).chatSdk) {
       handleLoaded();
     } else {
       window.addEventListener("chat-messenger-loaded", handleLoaded);
@@ -220,7 +241,7 @@ export default function ChatWidget() {
       if (el) el.removeEventListener("df-response-received", handleAgentResponse);
       window.removeEventListener("df-response-received", handleAgentResponse);
     };
-  }, [deploymentName, chatReady, session]);
+  }, [deploymentName, chatReady, session, chatTitle]);
 
   // Handler called by OnboardingForm on successful submit
   const handleFormComplete = (newSession: Session) => {
@@ -271,7 +292,7 @@ export default function ChatWidget() {
             "--chat-messenger-color--link": "#4a3b32",
             "--chat-messenger-internal-chat-window-width": "400px",
             "--chat-messenger-internal-chat-window-height": "560px",
-          }}
+          } as CSSProperties}
         >
           <chat-messenger-container ref={containerRef}>
             <chat-reset-session-button

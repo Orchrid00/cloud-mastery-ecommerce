@@ -27,7 +27,7 @@ function ShopNavigation() {
     <header className="sticky top-0 z-40 border-b border-amber-100 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 md:px-6">
         <Link href="/shop" className="text-xl font-bold tracking-tight text-slate-900">
-          Hazel Market
+          Soko Marketplace
         </Link>
 
         <nav className="flex items-center gap-2 rounded-full bg-amber-50 p-1">

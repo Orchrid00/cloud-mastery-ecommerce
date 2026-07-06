@@ -25,6 +25,7 @@ FROM base AS builder
 # Accept build arguments with default values for flexibility (Docker Compose)
 ARG NEXT_PUBLIC_APP_NAME=""
 ARG NEXT_PUBLIC_API_URL=""
+ARG NEXT_PUBLIC_CART_API_URL=""
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -35,6 +36,7 @@ RUN if [ -f .env ]; then \
   else \
   export NEXT_PUBLIC_APP_NAME="${NEXT_PUBLIC_APP_NAME}"; \
   export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}"; \
+  export NEXT_PUBLIC_CART_API_URL="${NEXT_PUBLIC_CART_API_URL}"; \
   fi && \
   npm run build --legacy-peer-deps
 

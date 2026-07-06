@@ -1,12 +1,21 @@
+import type { DetailedHTMLProps, HTMLAttributes } from "react";
+
 export {};
 
-declare global {
+type ChatElementProps = DetailedHTMLProps<
+  HTMLAttributes<HTMLElement>,
+  HTMLElement
+> & {
+  [key: string]: unknown;
+};
+
+declare module "react" {
   namespace JSX {
     interface IntrinsicElements {
-      "chat-messenger": any;
-      "chat-messenger-container": any;
-      "chat-reset-session-button": any;
-      "chat-messenger-close-button": any;
+      "chat-messenger": ChatElementProps;
+      "chat-messenger-container": ChatElementProps;
+      "chat-reset-session-button": ChatElementProps;
+      "chat-messenger-close-button": ChatElementProps;
     }
   }
 }

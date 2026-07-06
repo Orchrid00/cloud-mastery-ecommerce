@@ -3,7 +3,7 @@ import ChatWidget from "./components/ChatWidget";
 import Script from "next/script";
 
 export const metadata = {
-  title: "Hazel Market",
+  title: "Soko Marketplace",
   description: "Standalone storefront application",
 };
 
