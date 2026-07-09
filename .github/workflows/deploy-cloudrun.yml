@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  deploy-services:
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
@@ -17,12 +17,7 @@ jobs:
       DEPLOYER_SERVICE_ACCOUNT: ${{ secrets.GCP_DEPLOYER_SERVICE_ACCOUNT_EMAIL || secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
       BACKEND_SERVICE_NAME: ${{ secrets.CLOUD_RUN_BACKEND_SERVICE_NAME }}
       FRONTEND_SERVICE_NAME: ${{ secrets.CLOUD_RUN_FRONTEND_SERVICE_NAME }}
-      CART_AGENT_FUNCTION_NAME: cart-agent
-      CONNECT_BIGQUERY_FUNCTION_NAME: sync-mysql-to-bq
-      SEARCH_PRODUCTS_FUNCTION_NAME: search-products
       BQ_DATASET: ${{ vars.BQ_DATASET || 'cloud_mastery' }}
-      BQ_PRODUCTS_TABLE: ${{ vars.BQ_PRODUCTS_TABLE || 'products' }}
-      CONNECT_BIGQUERY_TABLES: ${{ vars.CONNECT_BIGQUERY_TABLES || 'table_parts_catalog,table_finance,orders,order_details,customers,products' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -73,34 +68,12 @@ jobs:
             echo "$lowered"
           }
 
-          sanitize_function_name() {
-            local raw="$1"
-            local lowered
-            lowered="$(echo "$raw" | tr '[:upper:]' '[:lower:]')"
-            lowered="$(echo "$lowered" | sed -E 's/[^a-z0-9-]+/-/g; s/-+/-/g; s/^-+//; s/-+$//')"
-            if [[ ! "$lowered" =~ ^[a-z] ]]; then
-              lowered="fn-${lowered}"
-            fi
-            lowered="${lowered:0:63}"
-            lowered="$(echo "$lowered" | sed -E 's/-+$//')"
-            if [[ -z "$lowered" ]]; then
-              lowered="fn-app"
-            fi
-            echo "$lowered"
-          }
-
           PROJECT_ID_LC="$(echo "$PROJECT_ID" | tr '[:upper:]' '[:lower:]')"
           BACKEND_SERVICE_SAFE="$(sanitize_cloud_run_name "$BACKEND_SERVICE_NAME")"
           FRONTEND_SERVICE_SAFE="$(sanitize_cloud_run_name "$FRONTEND_SERVICE_NAME")"
-          CART_AGENT_FUNCTION_SAFE="$(sanitize_function_name "$CART_AGENT_FUNCTION_NAME")"
-          CONNECT_BIGQUERY_FUNCTION_SAFE="$(sanitize_function_name "$CONNECT_BIGQUERY_FUNCTION_NAME")"
-          SEARCH_PRODUCTS_FUNCTION_SAFE="$(sanitize_function_name "$SEARCH_PRODUCTS_FUNCTION_NAME")"
 
           echo "BACKEND_SERVICE_NAME_SAFE=${BACKEND_SERVICE_SAFE}" >> "$GITHUB_ENV"
           echo "FRONTEND_SERVICE_NAME_SAFE=${FRONTEND_SERVICE_SAFE}" >> "$GITHUB_ENV"
-          echo "CART_AGENT_FUNCTION_NAME_SAFE=${CART_AGENT_FUNCTION_SAFE}" >> "$GITHUB_ENV"
-          echo "CONNECT_BIGQUERY_FUNCTION_NAME_SAFE=${CONNECT_BIGQUERY_FUNCTION_SAFE}" >> "$GITHUB_ENV"
-          echo "SEARCH_PRODUCTS_FUNCTION_NAME_SAFE=${SEARCH_PRODUCTS_FUNCTION_SAFE}" >> "$GITHUB_ENV"
           echo "BACKEND_IMAGE=gcr.io/${PROJECT_ID_LC}/${BACKEND_SERVICE_SAFE}:${GITHUB_SHA}" >> "$GITHUB_ENV"
           echo "FRONTEND_IMAGE=gcr.io/${PROJECT_ID_LC}/${FRONTEND_SERVICE_SAFE}:${GITHUB_SHA}" >> "$GITHUB_ENV"
 
@@ -209,6 +182,77 @@ jobs:
             --region $REGION \
             --port 3000 \
             --allow-unauthenticated
+
+  deploy-functions:
+    runs-on: ubuntu-latest
+    needs: deploy-services
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    env:
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      REGION: ${{ secrets.GCP_REGION }}
+      DEPLOYER_SERVICE_ACCOUNT: ${{ secrets.GCP_DEPLOYER_SERVICE_ACCOUNT_EMAIL || secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      CART_AGENT_FUNCTION_NAME: cart-agent
+      CONNECT_BIGQUERY_FUNCTION_NAME: sync-mysql-to-bq
+      SEARCH_PRODUCTS_FUNCTION_NAME: search-products
+      BQ_DATASET: ${{ vars.BQ_DATASET || 'cloud_mastery' }}
+      BQ_PRODUCTS_TABLE: ${{ vars.BQ_PRODUCTS_TABLE || 'products' }}
+      CONNECT_BIGQUERY_TABLES: ${{ vars.CONNECT_BIGQUERY_TABLES || 'table_parts_catalog,table_finance,orders,order_details,customers,products' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets for functions
+        run: |
+          set -euo pipefail
+          : "${{ secrets.GCP_PROJECT_ID }}"
+          : "${{ secrets.GCP_REGION }}"
+          : "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}"
+          : "${{ secrets.GCP_DEPLOYER_SERVICE_ACCOUNT_EMAIL || secrets.GCP_SERVICE_ACCOUNT_EMAIL }}"
+          : "${{ secrets.CLOUDSQL_INSTANCE_CONNECTION_NAME }}"
+          : "${{ secrets.DB_USER }}"
+          : "${{ secrets.DB_PASSWORD || secrets.DB_PASS }}"
+          : "${{ secrets.DB_NAME }}"
+
+      - name: Authenticate to Google Cloud with Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
+          token_format: 'access_token'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          install_components: 'beta'
+
+      - name: Prepare lowercase function names
+        run: |
+          sanitize_function_name() {
+            local raw="$1"
+            local lowered
+            lowered="$(echo "$raw" | tr '[:upper:]' '[:lower:]')"
+            lowered="$(echo "$lowered" | sed -E 's/[^a-z0-9-]+/-/g; s/-+/-/g; s/^-+//; s/-+$//')"
+            if [[ ! "$lowered" =~ ^[a-z] ]]; then
+              lowered="fn-${lowered}"
+            fi
+            lowered="${lowered:0:63}"
+            lowered="$(echo "$lowered" | sed -E 's/-+$//')"
+            if [[ -z "$lowered" ]]; then
+              lowered="fn-app"
+            fi
+            echo "$lowered"
+          }
+
+          CART_AGENT_FUNCTION_SAFE="$(sanitize_function_name "$CART_AGENT_FUNCTION_NAME")"
+          CONNECT_BIGQUERY_FUNCTION_SAFE="$(sanitize_function_name "$CONNECT_BIGQUERY_FUNCTION_NAME")"
+          SEARCH_PRODUCTS_FUNCTION_SAFE="$(sanitize_function_name "$SEARCH_PRODUCTS_FUNCTION_NAME")"
+
+          echo "CART_AGENT_FUNCTION_NAME_SAFE=${CART_AGENT_FUNCTION_SAFE}" >> "$GITHUB_ENV"
+          echo "CONNECT_BIGQUERY_FUNCTION_NAME_SAFE=${CONNECT_BIGQUERY_FUNCTION_SAFE}" >> "$GITHUB_ENV"
+          echo "SEARCH_PRODUCTS_FUNCTION_NAME_SAFE=${SEARCH_PRODUCTS_FUNCTION_SAFE}" >> "$GITHUB_ENV"
 
       - name: Deploy Cart Agent Cloud Function (Gen2)
         run: |
