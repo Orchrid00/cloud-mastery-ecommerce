@@ -46,13 +46,6 @@ echo "Discovery Engine SA: ${DISCOVERY_ENGINE_SA}"
 echo "Repo Principal: ${REPO_PRINCIPAL}"
 echo "WIF Provider: ${WIF_PROVIDER_RESOURCE}"
 
-echo "Validating workload identity provider exists..."
-gcloud iam workload-identity-pools providers describe "${WIF_PROVIDER_ID}" \
-  --project "${WIF_PROJECT_ID}" \
-  --location global \
-  --workload-identity-pool "${WIF_POOL_ID}" \
-  --format='value(name)' >/dev/null
-
 echo "Enabling required APIs in WIF project..."
 gcloud services enable \
   cloudresourcemanager.googleapis.com \
@@ -119,7 +112,6 @@ for ROLE in \
   roles/secretmanager.admin \
   roles/secretmanager.secretAccessor \
   roles/storage.admin \
-  roles/storage.objectViewer \
   roles/logging.logWriter \
   roles/artifactregistry.writer \
   roles/artifactregistry.createOnPushWriter \
@@ -210,6 +202,13 @@ do
     --format=none
   echo "Assigned to ${DISCOVERY_ENGINE_SA}: ${ROLE}"
 done
+
+echo "Validating workload identity provider exists..."
+gcloud iam workload-identity-pools providers describe "${WIF_PROVIDER_ID}" \
+  --project "${WIF_PROJECT_ID}" \
+  --location global \
+  --workload-identity-pool "${WIF_POOL_ID}" \
+  --format='value(name)' >/dev/null
 
 echo "Granting WIF principal impersonation permissions on service account..."
 gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
